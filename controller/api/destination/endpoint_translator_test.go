@@ -61,6 +61,49 @@ var (
 		OwnerName: "rc-name",
 	}
 
+	// podForeignCP is meshed by a different Linkerd control plane
+	// (control-plane-ns "other-linkerd") than the one running the destination
+	// controller. Under a shared trust root, identity must still be advertised
+	// for it, with a SAN derived from its own control-plane-ns label.
+	podForeignCP = watcher.Address{
+		IP:   "1.1.1.9",
+		Port: 1,
+		Pod: &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-foreign-cp",
+				Namespace: "ns",
+				Labels: map[string]string{
+					k8s.ControllerNSLabel:    "other-linkerd",
+					k8s.ProxyDeploymentLabel: "deployment-name",
+				},
+			},
+			Spec: corev1.PodSpec{
+				ServiceAccountName: "serviceaccount-name",
+				Containers: []corev1.Container{
+					{
+						Name: k8s.ProxyContainerName,
+						Env: []corev1.EnvVar{
+							{
+								Name:  envInboundListenAddr,
+								Value: "0.0.0.0:4143",
+							},
+							{
+								Name:  envAdminListenAddr,
+								Value: "0.0.0.0:4191",
+							},
+							{
+								Name:  envControlListenAddr,
+								Value: "0.0.0.0:4190",
+							},
+						},
+					},
+				},
+			},
+		},
+		OwnerKind: "replicationcontroller",
+		OwnerName: "rc-name",
+	}
+
 	pod2 = watcher.Address{
 		IP:   "1.1.1.2",
 		Port: 2,
@@ -749,6 +792,31 @@ func TestEndpointTranslatorForPods(t *testing.T) {
 		defer translator.Stop()
 
 		translator.Add(mkAddressSetForPods(t, pod1))
+
+		addrs := (<-mockGetServer.updatesReceived).GetAdd().GetAddrs()
+		if len(addrs) != 1 {
+			t.Fatalf("Expected [1] address returned, got %v", addrs)
+		}
+
+		actualTLSIdentity := addrs[0].GetTlsIdentity().GetDnsLikeIdentity()
+		if diff := deep.Equal(actualTLSIdentity, expectedTLSIdentity); diff != nil {
+			t.Fatalf("Expected TlsIdentity to be [%v] but was [%v]", expectedTLSIdentity, actualTLSIdentity)
+		}
+	})
+
+	t.Run("Sends TlsIdentity for pods meshed by a different control plane", func(t *testing.T) {
+		// The SAN is derived from the pod's own control-plane-ns label
+		// ("other-linkerd"), not the destination controller's namespace, so
+		// that a shared trust root can authenticate cross-control-plane peers.
+		expectedTLSIdentity := &pb.TlsIdentity_DnsLikeIdentity{
+			Name: "serviceaccount-name.ns.serviceaccount.identity.other-linkerd.trust.domain",
+		}
+
+		mockGetServer, translator := makeEndpointTranslator(t)
+		translator.Start()
+		defer translator.Stop()
+
+		translator.Add(mkAddressSetForPods(t, podForeignCP))
 
 		addrs := (<-mockGetServer.updatesReceived).GetAdd().GetAddrs()
 		if len(addrs) != 1 {

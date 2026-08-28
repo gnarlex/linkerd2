@@ -210,7 +210,6 @@ func (s *server) Get(dest *pb.GetDestination, stream pb.Destination_GetServer) e
 			return status.Errorf(codes.NotFound, "Remote cluster not found: %s", cluster)
 		}
 		translator, err := newEndpointTranslator(
-			s.config.ControllerNS,
 			remoteConfig.TrustDomain,
 			s.config.ForceOpaqueTransport,
 			s.config.EnableH2Upgrade,
@@ -253,7 +252,6 @@ func (s *server) Get(dest *pb.GetDestination, stream pb.Destination_GetServer) e
 		log.Debug("Local discovery service detected")
 		// Local discovery
 		translator, err := newEndpointTranslator(
-			s.config.ControllerNS,
 			s.config.IdentityTrustDomain,
 			s.config.ForceOpaqueTransport,
 			s.config.EnableH2Upgrade,
@@ -586,7 +584,6 @@ func (s *server) subscribeToEndpointProfile(
 	translator := newEndpointProfileTranslator(
 		s.config.ForceOpaqueTransport,
 		s.config.EnableH2Upgrade,
-		s.config.ControllerNS,
 		s.config.IdentityTrustDomain,
 		s.config.DefaultOpaquePorts,
 		s.config.MeshedHttp2ClientParams,

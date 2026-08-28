@@ -1180,7 +1180,6 @@ metadata:
 
 	mockGetServer := &mockDestinationGetServer{updatesReceived: make(chan *pb.Update, 50)}
 	translator, err := newEndpointTranslator(
-		"linkerd",
 		"trust.domain",
 		forceOpaqueTransport,
 		true,  // enableH2Upgrade
