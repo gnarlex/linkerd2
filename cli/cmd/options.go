@@ -369,6 +369,12 @@ func makeProxyFlags(defaults *l5dcharts.Values) ([]flag.Flag, *pflag.FlagSet) {
 				return nil
 			}),
 
+		flag.NewStringFlag(proxyFlags, "default-outbound-policy", defaults.Proxy.DefaultOutboundPolicy, "Outbound policy to use to control outbound access from the proxy",
+			func(values *l5dcharts.Values, value string) error {
+				values.Proxy.DefaultOutboundPolicy = value
+				return nil
+			}),
+
 		// Deprecated flags
 
 		flag.NewStringFlag(proxyFlags, "proxy-memory", defaults.Proxy.Resources.Memory.Request, "Amount of Memory that the proxy sidecar requests",
@@ -612,21 +618,33 @@ func validateProxyValues(values *l5dcharts.Values) error {
 		}
 	}
 
-	if err := validatePolicy(values.Proxy.DefaultInboundPolicy); err != nil {
+	if err := validatePolicy("default-inbound-policy", values.Proxy.DefaultInboundPolicy, validInboundPolicies); err != nil {
+		return err
+	}
+
+	if err := validatePolicy("default-outbound-policy", values.Proxy.DefaultOutboundPolicy, validOutboundPolicies); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func validatePolicy(policy string) error {
-	validPolicies := []string{"all-authenticated", "all-unauthenticated", "cluster-authenticated", "cluster-unauthenticated", "deny", "audit"}
+// validInboundPolicies are the accepted values for --default-inbound-policy.
+var validInboundPolicies = []string{"all-authenticated", "all-unauthenticated", "cluster-authenticated", "cluster-unauthenticated", "deny", "audit"}
+
+// validOutboundPolicies are the accepted values for --default-outbound-policy.
+// The proxy implements the outbound default policy as an mTLS requirement on
+// resolved endpoints, so only these three values are meaningful; deny,
+// cluster-unauthenticated and audit are inbound-only.
+var validOutboundPolicies = []string{"all-unauthenticated", "all-authenticated", "cluster-authenticated"}
+
+func validatePolicy(flagName, policy string, validPolicies []string) error {
 	for _, p := range validPolicies {
 		if p == policy {
 			return nil
 		}
 	}
-	return fmt.Errorf("--default-inbound-policy must be one of: %s (got %s)", strings.Join(validPolicies, ", "), policy)
+	return fmt.Errorf("--%s must be one of: %s (got %s)", flagName, strings.Join(validPolicies, ", "), policy)
 }
 
 // initializeIssuerCredentials populates the identity issuer TLS credentials.
