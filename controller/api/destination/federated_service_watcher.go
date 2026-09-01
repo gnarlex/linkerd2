@@ -359,7 +359,6 @@ func (fs *federatedService) remoteDiscoverySubscribe(
 	}
 
 	translator, err := newEndpointTranslator(
-		fs.config.ControllerNS,
 		remoteConfig.TrustDomain,
 		fs.config.ForceOpaqueTransport,
 		fs.config.EnableH2Upgrade,
@@ -421,7 +420,6 @@ func (fs *federatedService) localDiscoverySubscribe(
 	localDiscovery string,
 ) {
 	translator, err := newEndpointTranslator(
-		fs.config.ControllerNS,
 		fs.config.IdentityTrustDomain,
 		fs.config.ForceOpaqueTransport,
 		fs.config.EnableH2Upgrade,

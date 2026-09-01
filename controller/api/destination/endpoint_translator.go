@@ -33,7 +33,6 @@ const (
 // into Destination.Get messages.
 type (
 	endpointTranslator struct {
-		controllerNS        string
 		identityTrustDomain string
 		nodeTopologyZone    string
 		defaultOpaquePorts  map[uint32]struct{}
@@ -74,7 +73,6 @@ var updatesQueueOverflowCounter = promauto.NewCounterVec(
 )
 
 func newEndpointTranslator(
-	controllerNS string,
 	identityTrustDomain string,
 	forceOpaqueTransport,
 	enableH2Upgrade,
@@ -105,7 +103,6 @@ func newEndpointTranslator(
 	}
 
 	return &endpointTranslator{
-		controllerNS,
 		identityTrustDomain,
 		nodeTopologyZone,
 		defaultOpaquePorts,
@@ -207,7 +204,7 @@ func (et *endpointTranslator) sendClientAdd(set watcher.AddressSet) {
 		if address.Pod != nil {
 			opaquePorts = watcher.GetAnnotatedOpaquePorts(address.Pod, et.defaultOpaquePorts)
 			wa, err = createWeightedAddr(address, opaquePorts,
-				et.forceOpaqueTransport, et.enableH2Upgrade, et.identityTrustDomain, et.controllerNS, et.meshedHTTP2ClientParams)
+				et.forceOpaqueTransport, et.enableH2Upgrade, et.identityTrustDomain, et.meshedHTTP2ClientParams)
 			if err != nil {
 				et.log.Errorf("Failed to translate Pod endpoints to weighted addr: %s", err)
 				continue
@@ -404,7 +401,6 @@ func createWeightedAddr(
 	forceOpaqueTransport bool,
 	enableH2Upgrade bool,
 	identityTrustDomain string,
-	controllerNS string,
 	meshedHttp2 *pb.Http2ClientParams,
 ) (*pb.WeightedAddr, error) {
 	tcpAddr, err := toAddr(address)
@@ -477,13 +473,17 @@ func createWeightedAddr(
 		}
 	}
 
-	// If the pod is controlled by the same Linkerd control plane, then it can
-	// participate in identity with peers.
+	// If the pod is meshed by any Linkerd control plane, then it can
+	// participate in identity with peers. The identity SAN is derived from the
+	// pod's own control-plane-ns label, so this assumes all control planes in
+	// the cluster share a trust root/domain. This is what lets an outbound
+	// default policy of all-/cluster-authenticated require mTLS to pods that
+	// are meshed by a different control plane.
 	//
-	// TODO this should be relaxed to match a trust domain annotation so that
-	// multiple meshes can participate in identity if they share trust roots.
+	// TODO this should be relaxed further to match a trust domain annotation so
+	// that meshes with distinct trust roots can be trusted selectively.
 	if identityTrustDomain != "" &&
-		controllerNSLabel == controllerNS &&
+		controllerNSLabel != "" &&
 		!isSkippedInboundPort {
 
 		id := fmt.Sprintf("%s.%s.serviceaccount.identity.%s.%s", sa, ns, controllerNSLabel, identityTrustDomain)

@@ -256,7 +256,9 @@ proxy:
   # endpoint; "cluster-authenticated" requires one only for endpoints within
   # `clusterNetworks`; "all-unauthenticated" permits cleartext (today's
   # behavior). One of: "all-unauthenticated", "all-authenticated",
-  # "cluster-authenticated"
+  # "cluster-authenticated". Note: for "all-authenticated"/"cluster-authenticated"
+  # to authenticate pods meshed by a different Linkerd control plane, all control
+  # planes in the cluster must share the same trust root.
   # @default -- "all-unauthenticated"
   defaultOutboundPolicy: "all-unauthenticated"
   # -- Configures the outbound transport mode. Valid values are "transport-header" and "transparent"
